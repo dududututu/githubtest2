@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Avoid Prime Number</title>
+  <style>
+    body { margin: 0; background: #222; user-select: none; }
+    canvas {
+      background-color: #eee;
+      display: block;
+      margin: 20px auto;
+      border: 2px solid black;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="160" height="120"></canvas>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    let gameover = false;
+    let score = 0;
+    let highScore = localStorage.getItem("highScore") || 0;
+    let lastMissedValue = null;
+
+    const player = {
+      x: width / 2,
+      y: height * 0.8,
+      r: 2
+    };
+
+    const enemyCount = 10;
+    const enemies = [];
+
+    function isPrime(n) {
+      if (n <= 1) return false;
+      if (n === 2) return true;
+      if (n % 2 === 0) return false;
+      for (let i = 3; i <= Math.sqrt(n); i += 2) {
+        if (n % i === 0) return false;
+      }
+      return true;
+    }
+
+    function resetEnemy(e) {
+      e.x = Math.random() * width;
+      e.y = 0;
+      e.vy = 1.5 + Math.random() * 1.5;
+      e.value = Math.floor(2 + Math.random() * 98);
+    }
+
+    function createEnemies() {
+      enemies.length = 0;
+      for (let i = 0; i < enemyCount; i++) {
+        const e = {};
+        resetEnemy(e);
+        enemies.push(e);
+      }
+    }
+
+    function checkCollision(e) {
+      const dx = e.x - player.x;
+      const dy = e.y - player.y;
+      const distSq = dx * dx + dy * dy;
+      const rSum = 4 + player.r;
+      return distSq < rSum * rSum;
+    }
+
+    function updateEnemies() {
+      for (const e of enemies) {
+        e.y += e.vy;
+
+        if (!gameover && checkCollision(e)) {
+          if (isPrime(e.value)) {
+            score += e.value;
+            if (score > highScore) {
+              highScore = score;
+              localStorage.setItem("highScore", highScore);
+            }
+            resetEnemy(e);
+          } else {
+            gameover = true;
+            lastMissedValue = e.value;
+          }
+        }
+
+        if (e.y > height) {
+          resetEnemy(e);
+        }
+      }
+    }
+
+    function drawPlayer() {
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+      ctx.fillStyle = "green";
+      ctx.fill();
+    }
+
+    function drawEnemy(e) {
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "black";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "blue";
+      ctx.fill();
+
+      ctx.fillStyle = "white";
+      ctx.font = "6px monospace";
+      const valStr = e.value.toString();
+      ctx.fillText(valStr, e.x - valStr.length * 2, e.y + 2);
+    }
+
+    function drawScore() {
+      ctx.fillStyle = "black";
+      ctx.font = "7px monospace";
+      ctx.fillText(`Score: ${score}`, 5, 10);
+      ctx.fillText(`High: ${highScore}`, 5, 20);
+    }
+
+    function drawGameOver() {
+      ctx.fillStyle = "#ddd";
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = "red";
+      ctx.font = "10px monospace";
+      ctx.fillText("GAME OVER", 35, 50);
+
+      ctx.fillStyle = "black";
+      ctx.font = "7px monospace";
+      ctx.fillText(`Score: ${score}`, 35, 65);
+      ctx.fillText(`High: ${highScore}`, 35, 75);
+
+      if (lastMissedValue !== null) {
+        const factors = getFactors(lastMissedValue);
+        ctx.fillText(`${lastMissedValue} = ${factors.join("×")}`, 5, 90);
+      }
+
+      ctx.fillStyle = "blue";
+      ctx.fillText("Click to retry", 30, 110);
+    }
+
+    function getFactors(n) {
+      const factors = [];
+      let i = 2;
+      while (i * i <= n) {
+        while (n % i === 0) {
+          factors.push(i);
+          n /= i;
+        }
+        i++;
+      }
+      if (n > 1) factors.push(n);
+      return factors;
+    }
+
+    function draw() {
+      ctx.fillStyle = "#eee";
+      ctx.fillRect(0, 0, width, height);
+
+      if (gameover) {
+        drawGameOver();
+      } else {
+        drawPlayer();
+        for (const e of enemies) {
+          drawEnemy(e);
+        }
+        drawScore();
+        updateEnemies();
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    function resetGame() {
+      score = 0;
+      gameover = false;
+      lastMissedValue = null;
+      createEnemies();
+    }
+
+    canvas.addEventListener("mousemove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      player.x = e.clientX - rect.left;
+    });
+
+    canvas.addEventListener("touchmove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      player.x = touch.clientX - rect.left;
+      e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener("click", () => {
+      if (gameover) {
+        resetGame();
+      }
+    });
+
+    resetGame();
+    draw();
+  </script>
+</body>
+</html>
